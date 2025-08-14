@@ -9,6 +9,8 @@ in real time.
 
 This system enables real-time monitoring of a user's breathing behaviour and the CO<sub>2</sub> concentration inside a mask by setting up a small tag inside a mask. 
 
-1. [Need for an CO<sub>2</sub> monitor](Documentation/problem.md)
-2. [Requirements](Documentation/requirements.md)
-3. [Design](Documentation/design.md)
+1. [Need for an CO<sub>2</sub> monitor](https://github.com/RavinduRidmal/respiration-monitor/wiki/Problem)
+2. [Requirements](https://github.com/RavinduRidmal/respiration-monitor/wiki/Requirements)
+3. [Design](https://github.com/RavinduRidmal/respiration-monitor/wiki/Design)
+
+For more information visit the [Wiki](https://github.com/RavinduRidmal/respiration-monitor/wiki).
