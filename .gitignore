@@ -1,2 +1,5 @@
 /Documentation
+/libraries
+/requirements.txt
+/breathing_data
 # Ignore documentation files. They are already in the wiki pages.
