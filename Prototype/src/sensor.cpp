@@ -2,7 +2,7 @@
 
 SensorManager sensorManager;
 
-SensorManager::SensorManager() : ens160(ENS160_I2CADDR_0) {
+SensorManager::SensorManager() : ens160(0x53) {
     initialized = false;
     lastReadTime = 0;
     lastReading = {0, 0, 0, false, 0};
@@ -12,7 +12,7 @@ bool SensorManager::begin() {
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     
     // Initialize AHT21 sensor for humidity and temperature
-    if (!aht.begin()) {
+    if (!aht.begin(&Wire)) {
         Serial.println("Failed to find AHT21 sensor!");
         return false;
     }
@@ -25,7 +25,9 @@ bool SensorManager::begin() {
     }
     Serial.println("ENS160 sensor initialized");
     
-    // Set ENS160 operation mode to standard
+    // Reset ENS160 and set standard operating mode
+    ens160.setMode(ENS160_OPMODE_RESET);
+    delay(100);
     if (!ens160.setMode(ENS160_OPMODE_STD)) {
         Serial.println("Failed to set ENS160 operating mode!");
         return false;

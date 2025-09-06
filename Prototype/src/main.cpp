@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <esp_sleep.h>
 #include <esp_bt.h>
-#include <esp_wifi.h>
 
 #include "config.h"
 #include "sensor.h"
@@ -242,8 +241,7 @@ void enterDeepSleep() {
     Serial.println("Entering deep sleep mode...");
     Serial.flush();
     
-    // Disable WiFi and Bluetooth to save power
-    esp_wifi_stop();
+    // Disable Bluetooth to save power
     esp_bt_controller_disable();
     
     // Additional power saving configurations
