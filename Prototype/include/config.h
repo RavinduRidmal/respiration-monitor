@@ -4,7 +4,7 @@
 // Pin definitions
 #define I2C_SDA_PIN         21    // SDA pin for ENS160 + AHT21 sensors
 #define I2C_SCL_PIN         22    // SCL pin for ENS160 + AHT21 sensors
-#define BUTTON_PIN          2     // Push button pin (with internal pull-up)
+#define BUTTON_PIN          14    // Push button pin (with internal pull-up)
 #define BUZZER_PIN          4     // Buzzer PWM pin
 
 // Wake up source

@@ -38,7 +38,6 @@ public:
     bool isConnected();
     bool hasTimedOut();
     void stop();
-    void handleConnection();
 };
 
 // Callback classes

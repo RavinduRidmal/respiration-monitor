@@ -13,19 +13,16 @@ bool SensorManager::begin() {
     
     // Initialize AHT21 sensor for humidity and temperature
     if (!aht.begin(&Wire)) {
-        Serial.println("Failed to find AHT21 sensor!");
         return false;
     }
     Serial.println("AHT21 sensor initialized");
     
     // Initialize ENS160 sensor for CO2
     if (!ens160.begin()) {
-        Serial.println("Failed to find ENS160 sensor!");
         return false;
     }
     Serial.println("ENS160 sensor initialized");
     
-    // Reset ENS160 and set standard operating mode
     ens160.setMode(ENS160_OPMODE_RESET);
     delay(100);
     if (!ens160.setMode(ENS160_OPMODE_STD)) {

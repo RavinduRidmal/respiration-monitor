@@ -14,6 +14,7 @@ BLEManager::BLEManager() {
     oldDeviceConnected = false;
     pendingCommand = CMD_NONE;
     bleStartTime = 0;
+    
     // Set global pointer in constructor
     g_bleManager = this;
 }
@@ -66,21 +67,19 @@ void BLEManager::sendSensorData(const SensorData& data, AlertLevel alertLevel) {
     if (!deviceConnected || !dataCharacteristic) {
         return;
     }
-    
-    // Create JSON-like string with sensor data
-    String jsonData = "{";
-    jsonData += "\"co2\":" + String(data.co2_ppm, 1) + ",";
-    jsonData += "\"humidity\":" + String(data.humidity_percent, 1) + ",";
-    jsonData += "\"temperature\":" + String(data.temperature_celsius, 1) + ",";
-    jsonData += "\"alert\":" + String((int)alertLevel) + ",";
-    jsonData += "\"timestamp\":" + String(data.timestamp);
-    jsonData += "}";
-    
-    dataCharacteristic->setValue(jsonData.c_str());
+
+String json = String("{\"co2\":") + data.co2_ppm +
+              ",\"humidity\":" + data.humidity_percent +
+              ",\"temperature\":" + data.temperature_celsius +
+              ",\"alert\":" + alertLevel +
+              ",\"timestamp\":" + data.timestamp + "}";
+
+    dataCharacteristic->setValue(json.c_str());
     dataCharacteristic->notify();
-    
-    Serial.println("Sent data via BLE: " + jsonData);
+
+    Serial.printf("Sent data (json) - %s\n", json.c_str());
 }
+
 
 BLECommand BLEManager::getCommand() {
     return pendingCommand;
@@ -103,26 +102,6 @@ void BLEManager::stop() {
         server->getAdvertising()->stop();
         Serial.println("BLE advertising stopped");
     }
-    // Don't set g_bleManager to nullptr here as the object still exists
-}
-
-void BLEManager::handleConnection() {
-    // Handle disconnection
-    if (!deviceConnected && oldDeviceConnected) {
-        Serial.println("Device disconnected");
-        delay(500); // Give the bluetooth stack time to process
-        if (server) {
-            server->startAdvertising(); // Restart advertising
-            Serial.println("Restarted advertising");
-        }
-        oldDeviceConnected = deviceConnected;
-    }
-    
-    // Handle new connection
-    if (deviceConnected && !oldDeviceConnected) {
-        Serial.println("Device connected");
-        oldDeviceConnected = deviceConnected;
-    }
 }
 
 // Server callback implementations
@@ -130,6 +109,7 @@ void ServerCallbacks::onConnect(BLEServer* pServer) {
     if (g_bleManager != nullptr) {
         g_bleManager->deviceConnected = true;
         Serial.println("BLE client connected");
+        pServer->getAdvertising()->stop();
     } else {
         Serial.println("Error: g_bleManager is null in onConnect");
     }
@@ -139,10 +119,13 @@ void ServerCallbacks::onDisconnect(BLEServer* pServer) {
     if (g_bleManager != nullptr) {
         g_bleManager->deviceConnected = false;
         Serial.println("BLE client disconnected");
+
+        pServer->startAdvertising();
     } else {
         Serial.println("Error: g_bleManager is null in onDisconnect");
     }
 }
+
 
 // Control characteristic callback implementation
 void ControlCallbacks::onWrite(BLECharacteristic* pCharacteristic) {
