@@ -9,13 +9,13 @@ volatile unsigned long ButtonManager::lastInterruptTime = 0;
 
 bool ButtonManager::begin() {
     pinMode(BUTTON_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, RISING);
     return true;
 }
 
 void ButtonManager::update() {
     if (buttonPressTime > 0 && !wasHeld_flag) {
-        if (digitalRead(BUTTON_PIN) == LOW && 
+        if (digitalRead(BUTTON_PIN) == HIGH && 
             (esp_timer_get_time() / 1000 - buttonPressTime) >= BUTTON_HOLD_TIME_MS) {
             wasHeld_flag = true;
         }
@@ -42,6 +42,7 @@ void IRAM_ATTR ButtonManager::buttonISR() {
     unsigned long currentTime = esp_timer_get_time() / 1000;
     
     if (currentTime - lastInterruptTime > BUTTON_DEBOUNCE_MS) {
+        Serial.println("Button pressed interrupt");
         wasPressed_flag = true;
         buttonPressTime = currentTime;
         lastInterruptTime = currentTime;

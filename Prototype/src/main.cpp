@@ -11,7 +11,6 @@
 SystemState currentState = STATE_SLEEPING;
 SensorData currentSensorData;
 AlertLevel currentAlert = ALERT_NONE;
-unsigned long stateStartTime = 0;
 unsigned long lastSensorRead = 0;
 bool systemInitialized = false;
 
@@ -27,21 +26,12 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     
-    // Initialize system
     setupSystem();
     
     // Determine initial state based on wakeup reason
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-        Serial.println("Woke up from button press");
-        currentState = STATE_WAKING_UP;
-    } else {
-        Serial.println("Power on or reset, going to normal operation");
-        currentState = STATE_WAKING_UP;
-    }
-    
-    stateStartTime = millis();
+    currentState = STATE_WAKING_UP;
     systemInitialized = true;
 }
 
@@ -52,7 +42,6 @@ void loop() {
     
     buttonManager.update();
     buzzerManager.update();
-    bleManager.handleConnection();
     
     // Handle button interrupts (stop buzzer, sleep control)
     if (buttonManager.wasPressed()) {
@@ -66,7 +55,6 @@ void loop() {
         if (currentState != STATE_SLEEPING) {
             Serial.println("Button held - preparing for sleep");
             currentState = STATE_PREPARING_SLEEP;
-            stateStartTime = millis();
         }
     }
     
@@ -107,17 +95,15 @@ void setupSystem() {
     }
     
     // Configure deep sleep wakeup source
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, 0); // Wake up when button (GPIO2) goes LOW
-    }
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, 1);
+}
 
 void handleSystemStates() {
     unsigned long currentTime = millis();
     
     switch (currentState) {
         case STATE_WAKING_UP:
-            Serial.println("State: Waking Up");
             currentState = STATE_READING_SENSORS;
-            stateStartTime = currentTime;
             break;
             
         case STATE_READING_SENSORS:
@@ -127,7 +113,6 @@ void handleSystemStates() {
                 if (sensorManager.readSensors(currentSensorData)) {
                     lastSensorRead = currentTime;
                     currentState = STATE_PROCESSING_ALERTS;
-                    stateStartTime = currentTime;
                 } else {
                     Serial.println("Failed to read sensors, retrying...");
                     delay(500);
@@ -139,7 +124,6 @@ void handleSystemStates() {
             Serial.println("State: Processing Alerts");
             processAlerts();
             currentState = STATE_BLE_COMMUNICATION;
-            stateStartTime = currentTime;
             break;
             
         case STATE_BLE_COMMUNICATION:
@@ -148,15 +132,14 @@ void handleSystemStates() {
                 bleManager.sendSensorData(currentSensorData, currentAlert);
             }
             
-            // Check if we should continue or sleep
+            //Check if we should continue or sleep
             if (bleManager.hasTimedOut() && !bleManager.isConnected()) {
                 Serial.println("BLE timeout reached");
-                currentState = STATE_PREPARING_SLEEP;
-                stateStartTime = currentTime;
+                // currentState = STATE_PREPARING_SLEEP;
+                currentState = STATE_READING_SENSORS;
             } else {
                 // Continue monitoring
                 currentState = STATE_READING_SENSORS;
-                stateStartTime = currentTime;
             }
             break;
             
@@ -165,15 +148,12 @@ void handleSystemStates() {
             buzzerManager.stopAlert();
             bleManager.stop();
             
-            // Small delay to ensure BLE stops properly
             delay(1000);
-            
             enterDeepSleep();
             break;
             
         default:
             currentState = STATE_WAKING_UP;
-            stateStartTime = currentTime;
             break;
     }
 }
@@ -185,7 +165,6 @@ void processAlerts() {
     
     AlertLevel newAlert = sensorManager.getAlertLevel(currentSensorData.co2_ppm);
     
-    // Only trigger new alert if level changed and is not NONE
     if (newAlert != currentAlert && newAlert != ALERT_NONE) {
         currentAlert = newAlert;
         buzzerManager.startAlert(newAlert);
@@ -195,7 +174,6 @@ void processAlerts() {
     } else if (newAlert == ALERT_NONE && currentAlert != ALERT_NONE) {
         currentAlert = ALERT_NONE;
         buzzerManager.stopAlert();
-        Serial.println("Alert cleared");
     }
 }
 
@@ -212,7 +190,6 @@ void handleBLECommands() {
             case CMD_FORCE_SLEEP:
                 Serial.println("Executed: Force sleep");
                 currentState = STATE_PREPARING_SLEEP;
-                stateStartTime = millis();
                 break;
                 
             case CMD_REQUEST_DATA:
@@ -235,17 +212,15 @@ void handleBLECommands() {
     }
 }
 
-void enterDeepSleep() {
-    Serial.println("Entering deep sleep mode...");
+void enterDeepSleep() {    
+    // Make sure button is released before sleeping
+    while (digitalRead(BUTTON_PIN) == HIGH) {
+        delay(100);
+    }
+    
+    Serial.println("Button released, proceeding to sleep");
+    buzzerManager.playWelcomeSound();
     Serial.flush();
-    
-    // Disable Bluetooth to save power
-    esp_bt_controller_disable();
-    
-    // Additional power saving configurations
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
     
     // Enter deep sleep
     esp_deep_sleep_start();

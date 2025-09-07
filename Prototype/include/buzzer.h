@@ -10,12 +10,8 @@ private:
     AlertLevel currentAlert;
     unsigned long lastToggleTime;
     int currentRepeat;
-    
-    void setBuzzerPattern(AlertLevel level);
-    void updateBuzzer();
-    
+        
 public:
-    BuzzerManager();
     bool begin();
     void startAlert(AlertLevel level);
     void stopAlert();
@@ -23,6 +19,8 @@ public:
     void unmute();
     void update();
     bool isBuzzerActive();
+    void playWelcomeSound();
+
 };
 
 extern BuzzerManager buzzerManager;

@@ -2,18 +2,34 @@
 
 BuzzerManager buzzerManager;
 
-BuzzerManager::BuzzerManager() {
-    isMuted = false;
-    currentAlert = ALERT_NONE;
-    lastToggleTime = 0;
-    currentRepeat = 0;
-}
-
 bool BuzzerManager::begin() {
     ledcSetup(0, 1000, 8); // Channel 0, 1000 Hz, 8-bit resolution
     ledcAttachPin(BUZZER_PIN, 0);
-    ledcWrite(0, 0); // Start with buzzer off
+    ledcWrite(0, 0);
+    
+    playWelcomeSound();    
+    Serial.println("Buzzer initialized");
     return true;
+}
+
+void BuzzerManager::playWelcomeSound() {
+    // Low tone
+    ledcSetup(0, 800, 8);
+    ledcWrite(0, 128);
+    delay(150);
+    
+    // Mid tone
+    ledcSetup(0, 1200, 8);
+    delay(150);
+    
+    // High tone
+    ledcSetup(0, 1600, 8);
+    delay(200);
+
+    ledcSetup(0, 1000, 8); // Reset to default 1000 Hz
+    
+    // Turn off
+    ledcWrite(0, 0);
 }
 
 void BuzzerManager::startAlert(AlertLevel level) {
