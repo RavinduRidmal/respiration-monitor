@@ -108,9 +108,7 @@ void setupSystem() {
     
     // Configure deep sleep wakeup source
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, 0); // Wake up when button (GPIO2) goes LOW
-    
-    Serial.println("All systems initialized successfully");
-}
+    }
 
 void handleSystemStates() {
     unsigned long currentTime = millis();

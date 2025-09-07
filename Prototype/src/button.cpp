@@ -2,48 +2,24 @@
 
 ButtonManager buttonManager;
 
-ButtonManager::ButtonManager() {
-    lastDebounceTime = 0;
-    buttonPressTime = 0;
-    lastButtonState = HIGH;
-    buttonState = HIGH;
-    wasPressed_flag = false;
-    wasHeld_flag = false;
-}
+volatile bool ButtonManager::wasPressed_flag = false;
+volatile bool ButtonManager::wasHeld_flag = false;
+volatile unsigned long ButtonManager::buttonPressTime = 0;
+volatile unsigned long ButtonManager::lastInterruptTime = 0;
 
 bool ButtonManager::begin() {
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
     return true;
 }
 
 void ButtonManager::update() {
-    int reading = digitalRead(BUTTON_PIN);
-    
-    // Debouncing
-    if (reading != lastButtonState) {
-        lastDebounceTime = millis();
-    }
-    
-    if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_MS) {
-        if (reading != buttonState) {
-            buttonState = reading;
-            
-            if (buttonState == LOW) {
-                // Button pressed
-                wasPressed_flag = true;
-                buttonPressTime = millis();
-            }
-        }
-    }
-    
-    // Check for held state
-    if (buttonState == LOW && !wasHeld_flag) {
-        if ((millis() - buttonPressTime) >= BUTTON_HOLD_TIME_MS) {
+    if (buttonPressTime > 0 && !wasHeld_flag) {
+        if (digitalRead(BUTTON_PIN) == LOW && 
+            (esp_timer_get_time() / 1000 - buttonPressTime) >= BUTTON_HOLD_TIME_MS) {
             wasHeld_flag = true;
         }
     }
-    
-    lastButtonState = reading;
 }
 
 bool ButtonManager::wasPressed() {
@@ -60,4 +36,14 @@ bool ButtonManager::wasHeld() {
         return true;
     }
     return false;
+}
+
+void IRAM_ATTR ButtonManager::buttonISR() {
+    unsigned long currentTime = esp_timer_get_time() / 1000;
+    
+    if (currentTime - lastInterruptTime > BUTTON_DEBOUNCE_MS) {
+        wasPressed_flag = true;
+        buttonPressTime = currentTime;
+        lastInterruptTime = currentTime;
+    }
 }

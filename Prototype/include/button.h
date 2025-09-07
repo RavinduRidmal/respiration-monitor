@@ -6,15 +6,13 @@
 
 class ButtonManager {
 private:
-    unsigned long lastDebounceTime;
-    unsigned long buttonPressTime;
-    bool lastButtonState;
-    bool buttonState;
-    bool wasPressed_flag;
-    bool wasHeld_flag;
+    static volatile bool wasPressed_flag;
+    static volatile bool wasHeld_flag;
+    static volatile unsigned long buttonPressTime;
+    static volatile unsigned long lastInterruptTime;
+    static void IRAM_ATTR buttonISR();
     
 public:
-    ButtonManager();
     bool begin();
     void update();
     bool wasPressed();
