@@ -17,6 +17,17 @@ enum BLECommand {
     CMD_RESET_ALERTS = 4
 };
 
+// Compact binary packet structure for BLE transmission (18 bytes total)
+struct SensorPacket {
+    uint16_t co2;           // CO2 in ppm (2 bytes)
+    int16_t humidity;       // Humidity * 10 (2 bytes) 
+    int16_t temperature;    // Temperature * 10 (2 bytes)
+    uint8_t alert;          // Alert level (1 byte)
+    uint8_t status;         // Status flags (1 byte)
+    uint32_t timestamp;     // Timestamp in seconds since boot (4 bytes)
+    uint32_t sequence;      // Sequence number (4 bytes)
+} __attribute__((packed));
+
 class BLEManager {
 private:
     BLEServer* server;
@@ -25,6 +36,7 @@ private:
     BLECharacteristic* controlCharacteristic;
     bool oldDeviceConnected;
     unsigned long bleStartTime;
+    uint32_t sequenceNumber;
     
 public:
     bool deviceConnected;

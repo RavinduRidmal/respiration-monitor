@@ -14,6 +14,7 @@ BLEManager::BLEManager() {
     oldDeviceConnected = false;
     pendingCommand = CMD_NONE;
     bleStartTime = 0;
+    sequenceNumber = 0;
     
     // Set global pointer in constructor
     g_bleManager = this;
@@ -68,18 +69,27 @@ void BLEManager::sendSensorData(const SensorData& data, AlertLevel alertLevel) {
         return;
     }
 
-String json = String("{\"co2\":") + data.co2_ppm +
-              ",\"humidity\":" + data.humidity_percent +
-              ",\"temperature\":" + data.temperature_celsius +
-              ",\"alert\":" + alertLevel +
-              ",\"timestamp\":" + data.timestamp + "}";
+    // Create compact binary packet
+    SensorPacket packet;
+    packet.co2 = (uint16_t)data.co2_ppm;
+    packet.humidity = (int16_t)(data.humidity_percent * 10);
+    packet.temperature = (int16_t)(data.temperature_celsius * 10);
+    packet.alert = (uint8_t)alertLevel;
+    packet.status = data.valid ? 0x01 : 0x00;
+    packet.timestamp = (uint32_t)(millis() / 1000); // seconds since boot
+    packet.sequence = sequenceNumber++;
 
-    dataCharacteristic->setValue(json.c_str());
+    // Send binary data
+    dataCharacteristic->setValue((uint8_t*)&packet, sizeof(packet));
     dataCharacteristic->notify();
 
-    Serial.printf("Sent data (json) - %s\n", json.c_str());
+    Serial.printf("Sent binary packet - CO2: %d ppm, Temp: %d.%d°C, Hum: %d.%d%%, Alert: %d, Seq: %d\n", 
+                  packet.co2, 
+                  packet.temperature / 10, abs(packet.temperature % 10),
+                  packet.humidity / 10, abs(packet.humidity % 10),
+                  packet.alert,
+                  packet.sequence);
 }
-
 
 BLECommand BLEManager::getCommand() {
     return pendingCommand;
