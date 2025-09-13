@@ -1,4 +1,4 @@
-package com.example.mobile_application
+package com.respirationmonitor.mobile_app
 
 import io.flutter.embedding.android.FlutterActivity
 
