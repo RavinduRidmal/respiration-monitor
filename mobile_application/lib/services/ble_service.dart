@@ -26,7 +26,6 @@ class BleService extends ChangeNotifier {
   StreamSubscription<DiscoveredDevice>? _scanSubscription;
   StreamSubscription<ConnectionStateUpdate>? _connectionSubscription;
   StreamSubscription<List<int>>? _characteristicSubscription;
-  QualifiedCharacteristic? _dataCharacteristic;
   QualifiedCharacteristic? _controlCharacteristic;
   
   String? _connectedDeviceId;
@@ -132,16 +131,22 @@ class BleService extends ChangeNotifier {
 
       print('Starting BLE scan for $targetDeviceName devices...');
       
+      // Scan without service filter for better device discovery
       _scanSubscription = _ble.scanForDevices(
-        withServices: [Uuid.parse(serviceUuid)],
+        withServices: [], // Empty list means scan for all devices
         scanMode: ScanMode.lowLatency,
         requireLocationServicesEnabled: false,
       ).listen(
         (device) {
-          // Filter devices by name or service UUID
-          if (device.name == targetDeviceName || 
-              device.serviceUuids.contains(Uuid.parse(serviceUuid))) {
-            print('Found device: ${device.name} (${device.id})');
+          print('Discovered device: "${device.name}" (${device.id}) - RSSI: ${device.rssi}dBm');
+          
+          // Filter devices by name (more flexible than service UUID)
+          if (device.name.isNotEmpty && 
+              (device.name == targetDeviceName || 
+               device.name.toLowerCase().contains('respiration') ||
+               device.name.toLowerCase().contains('monitor') ||
+               device.name.contains('ESP32-Phone-Link'))) {
+            print('✅ Found matching device: ${device.name} (${device.id})');
             _scanResultsController.add(device);
           }
         },
@@ -172,6 +177,45 @@ class BleService extends ChangeNotifier {
     _isScanning = false;
     notifyListeners();
     print('BLE scan stopped');
+  }
+
+  /// Debug method to scan and show all nearby BLE devices
+  Future<void> startDebugScan() async {
+    if (_isScanning) return;
+
+    try {
+      _isScanning = true;
+      notifyListeners();
+
+      print('🔍 Starting DEBUG scan - showing ALL BLE devices...');
+      
+      _scanSubscription = _ble.scanForDevices(
+        withServices: [], // Scan for all devices
+        scanMode: ScanMode.lowLatency,
+        requireLocationServicesEnabled: false,
+      ).listen(
+        (device) {
+          print('🔍 DEBUG: Found device "${device.name}" (${device.id}) - RSSI: ${device.rssi}dBm, Services: ${device.serviceUuids}');
+          
+          // Add ALL devices to results for debugging
+          _scanResultsController.add(device);
+        },
+        onError: (error) {
+          print('Debug scan error: $error');
+        },
+      );
+
+      // Stop scanning after 30 seconds
+      Timer(const Duration(seconds: 30), () {
+        if (_isScanning) {
+          stopScan();
+        }
+      });
+    } catch (e) {
+      print('Failed to start debug scan: $e');
+      _isScanning = false;
+      notifyListeners();
+    }
   }
 
   /// Connect to a discovered BLE device
@@ -256,29 +300,26 @@ class BleService extends ChangeNotifier {
     try {
       final serviceUuidParsed = Uuid.parse(serviceUuid);
       
-      _dataCharacteristic = QualifiedCharacteristic(
-        serviceId: serviceUuidParsed,
-        characteristicId: Uuid.parse(dataCharacteristicUuid),
-        deviceId: deviceId,
-      );
-
+      // Only setup control characteristic since that's where ESP32 sends data
       _controlCharacteristic = QualifiedCharacteristic(
         serviceId: serviceUuidParsed,
         characteristicId: Uuid.parse(controlCharacteristicUuid),
         deviceId: deviceId,
       );
 
-      // Subscribe to data characteristic notifications
-      _characteristicSubscription = _ble.subscribeToCharacteristic(_dataCharacteristic!).listen(
+      // Subscribe to CONTROL characteristic notifications (where ESP32 actually sends data)
+      print('🔔 Subscribing to CONTROL characteristic for sensor data...');
+      _characteristicSubscription = _ble.subscribeToCharacteristic(_controlCharacteristic!).listen(
         (data) {
+          print('🔔 CONTROL characteristic notification received! ${data.length} bytes');
           _handleNotificationData(data);
         },
         onError: (error) {
-          print('Characteristic subscription error: $error');
+          print('💥 CONTROL characteristic subscription error: $error');
         },
       );
 
-      print('BLE characteristics setup complete');
+      print('✅ BLE characteristics setup complete - listening on control characteristic');
     } catch (e) {
       print('Failed to setup characteristics: $e');
       throw e;
@@ -379,7 +420,6 @@ class BleService extends ChangeNotifier {
     _characteristicSubscription = null;
     _connectionSubscription?.cancel();
     _connectionSubscription = null;
-    _dataCharacteristic = null;
     _controlCharacteristic = null;
   }
 

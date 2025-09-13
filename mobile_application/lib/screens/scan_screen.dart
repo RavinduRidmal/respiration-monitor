@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/ble_service.dart';
 import 'dashboard_screen.dart';
@@ -63,13 +64,20 @@ class _ScanScreenState extends State<ScanScreen> {
     final success = await bleService.initialize();
     if (!success && mounted) {
       setState(() {
-        _errorMessage = 'Failed to initialize Bluetooth. Please check permissions and try again.';
+        _errorMessage = 'Failed to initialize Bluetooth. Please check the following:\n\n'
+                       '1. Ensure Bluetooth is enabled on your device\n'
+                       '2. Grant all requested permissions in Settings\n'
+                       '3. Enable Location Services (required for BLE scanning)\n'
+                       '4. Try restarting the app';
       });
+      
+      // Show a dialog with more detailed instructions
+      _showPermissionHelpDialog();
     }
 
     // Try to auto-connect to last connected device
     final lastDevice = await bleService.getLastConnectedDevice();
-    if (lastDevice != null && mounted) {
+    if (lastDevice != null && mounted && success) {
       _showAutoReconnectDialog(lastDevice);
     }
   }
@@ -134,6 +142,33 @@ class _ScanScreenState extends State<ScanScreen> {
     _scanSubscription?.cancel();
   }
 
+  void _startDebugScan() {
+    setState(() {
+      _discoveredDevices.clear();
+      _errorMessage = null;
+    });
+
+    final bleService = context.read<BleService>();
+    
+    // Listen to scan results
+    _scanSubscription?.cancel();
+    _scanSubscription = bleService.scanResults.listen((device) {
+      if (mounted) {
+        setState(() {
+          // Avoid duplicates
+          final index = _discoveredDevices.indexWhere((d) => d.id == device.id);
+          if (index >= 0) {
+            _discoveredDevices[index] = device;
+          } else {
+            _discoveredDevices.add(device);
+          }
+        });
+      }
+    });
+
+    bleService.startDebugScan();
+  }
+
   Future<void> _connectToDevice(String deviceId) async {
     setState(() {
       _connectingDeviceId = deviceId;
@@ -172,6 +207,74 @@ class _ScanScreenState extends State<ScanScreen> {
         );
       },
     );
+  }
+
+  void _showPermissionHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.warning, color: Colors.orange),
+              const SizedBox(width: 8),
+              Flexible(
+                child: const Text('Bluetooth Setup Required'),
+              ),
+            ],
+          ),
+          content: const SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'To use this app, you need to:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 12),
+                Text('1. Enable Bluetooth on your device'),
+                SizedBox(height: 8),
+                Text('2. Grant location permission (required for Bluetooth scanning)'),
+                SizedBox(height: 8),
+                Text('3. Grant Bluetooth permissions when prompted'),
+                SizedBox(height: 8),
+                Text('4. Ensure Location Services are enabled in device settings'),
+                SizedBox(height: 12),
+                Text(
+                  'If permissions were denied, go to:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Text('Settings → Apps → Respiration Monitor → Permissions'),
+                SizedBox(height: 8),
+                Text('And enable all requested permissions.'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _retryInitialization();
+              },
+              child: const Text('Retry'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _retryInitialization() {
+    setState(() {
+      _errorMessage = null;
+    });
+    _initializeBle();
   }
 
   void _showMockModeDialog() {
@@ -229,9 +332,12 @@ class _ScanScreenState extends State<ScanScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Control buttons
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
+                // First row - main scan button
+                SizedBox(
+                  width: double.infinity,
                   child: bleService.isScanning
                       ? ElevatedButton.icon(
                           onPressed: _stopScan,
@@ -244,11 +350,25 @@ class _ScanScreenState extends State<ScanScreen> {
                           label: const Text('Scan for Devices'),
                         ),
                 ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _showMockModeDialog,
-                  icon: const Icon(Icons.developer_mode),
-                  label: const Text('Mock Mode'),
+                const SizedBox(height: 8),
+                // Second row - debug and mock buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: bleService.isScanning ? null : _startDebugScan,
+                        child: const Text('Debug Scan'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showMockModeDialog,
+                        icon: const Icon(Icons.developer_mode),
+                        label: const Text('Mock Mode'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -261,20 +381,47 @@ class _ScanScreenState extends State<ScanScreen> {
                 color: theme.colorScheme.errorContainer,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: theme.colorScheme.onErrorContainer,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
                             color: theme.colorScheme.onErrorContainer,
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: theme.colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _retryInitialization,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await openAppSettings();
+                              },
+                              icon: const Icon(Icons.settings),
+                              label: const Text('Open Settings'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

@@ -394,7 +394,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: (_lastCommandResult!.contains('successfully')
                                 ? theme.colorScheme.onPrimaryContainer
                                 : theme.colorScheme.onErrorContainer)
-                                .withOpacity(0.7),
+                                .withValues(alpha: 0.7),
                           ),
                         ),
                     ],

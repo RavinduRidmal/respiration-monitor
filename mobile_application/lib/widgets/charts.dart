@@ -24,7 +24,7 @@ class SensorSparkline extends StatelessWidget {
       return Container(
         height: 60,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Center(
@@ -50,7 +50,7 @@ class SensorSparkline extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -151,35 +151,36 @@ class _TimeSeriesChartState extends State<TimeSeriesChart> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Metric selector
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Time Series',
                   style: theme.textTheme.titleLarge,
                 ),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 'co2',
-                      label: Text('CO₂'),
-                      icon: Icon(Icons.co2, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'humidity',
-                      label: Text('Humidity'),
-                      icon: Icon(Icons.water_drop, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'temperature',
-                      label: Text('Temp'),
-                      icon: Icon(Icons.thermostat, size: 16),
-                    ),
-                  ],
-                  selected: {widget.selectedMetric},
-                  onSelectionChanged: (selection) {
-                    widget.onMetricChanged(selection.first);
-                  },
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'co2',
+                        label: Text('CO₂'),
+                      ),
+                      ButtonSegment(
+                        value: 'humidity',
+                        label: Text('Humidity'),
+                      ),
+                      ButtonSegment(
+                        value: 'temperature',
+                        label: Text('Temperature'),
+                      ),
+                    ],
+                    selected: {widget.selectedMetric},
+                    onSelectionChanged: (selection) {
+                      widget.onMetricChanged(selection.first);
+                    },
+                  ),
                 ),
               ],
             ),
@@ -245,7 +246,7 @@ class _TimeSeriesChartState extends State<TimeSeriesChart> {
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
             ),
           ),
         ],
@@ -306,7 +307,7 @@ class _TimeSeriesChartState extends State<TimeSeriesChart> {
           horizontalInterval: _getGridInterval(),
           getDrawingHorizontalLine: (value) {
             return FlLine(
-              color: theme.colorScheme.outline.withOpacity(0.2),
+              color: theme.colorScheme.outline.withValues(alpha: 0.2),
               strokeWidth: 1,
             );
           },
@@ -471,41 +472,48 @@ class MetricCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  icon,
-                  color: color,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+        child: SizedBox(
+          height: 180, // Fixed height to prevent overflow
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: color,
+                    size: 24,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${value.toStringAsFixed(1)} $unit',
-              style: theme.textTheme.displayMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            SensorSparkline(
-              data: data,
-              metric: metric,
-              color: color,
-              unit: unit,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                '${value.toStringAsFixed(1)} $unit',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SensorSparkline(
+                  data: data,
+                  metric: metric,
+                  color: color,
+                  unit: unit,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 /// Represents sensor data received from the ESP32 BLE peripheral
 class SensorData {
@@ -37,17 +38,17 @@ class SensorData {
       // Temperature can be negative (e.g., below freezing)
       final temperatureValue = _parseDouble(json['temperature'], 'temperature');
 
-      // Alert code validation (0 = no alert, 1 = warn, 2 = critical)
+      // Alert code validation (0-4 from ESP32: NONE, LOW, MEDIUM, HIGH, CRITICAL)
       final alertValue = json['alert'] is num ? (json['alert'] as num).toInt() : 0;
-      if (alertValue < 0 || alertValue > 2) {
+      if (alertValue < 0 || alertValue > 4) {
         throw FormatException('Alert value out of range: $alertValue');
       }
 
-      // Parse timestamp - use current time as fallback
+      // Parse timestamp - ESP32 sends millis() which needs to be converted to DateTime
       DateTime timestampValue;
       if (json['timestamp'] != null) {
-        final timestampMs = (json['timestamp'] as num).toInt();
-        timestampValue = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+        // ESP32 millis() is relative to boot time, so use current time instead
+        timestampValue = DateTime.now();
       } else {
         timestampValue = DateTime.now();
       }
@@ -102,9 +103,13 @@ class SensorData {
       case 0:
         return 'Normal';
       case 1:
-        return 'Warning';
+        return 'Low Alert';
       case 2:
-        return 'Critical';
+        return 'Medium Alert';
+      case 3:
+        return 'High Alert';
+      case 4:
+        return 'Critical Alert';
       default:
         return 'Unknown';
     }
@@ -117,8 +122,12 @@ class SensorData {
       case 0:
         return 0xFF4CAF50; // Green
       case 1:
-        return 0xFFFF9800; // Orange
+        return 0xFFFFEB3B; // Yellow
       case 2:
+        return 0xFFFF9800; // Orange
+      case 3:
+        return 0xFFFF5722; // Deep Orange
+      case 4:
         return 0xFFF44336; // Red
       default:
         return 0xFF9E9E9E; // Grey
@@ -180,13 +189,66 @@ class SensorDataParser {
     }
   }
 
-  /// Parses raw bytes (UTF-8 encoded JSON) to a SensorData object
+  /// Parses raw bytes from ESP32 SensorPacket to a SensorData object
+  /// 
+  /// ESP32 sends binary data in SensorPacket format (16 bytes total):
+  /// uint16_t co2;           // CO2 in ppm (2 bytes)
+  /// int16_t humidity;       // Humidity * 10 (2 bytes) 
+  /// int16_t temperature;    // Temperature * 10 (2 bytes)
+  /// uint8_t alert;          // Alert level (1 byte)
+  /// uint8_t status;         // Status flags (1 byte)
+  /// uint32_t timestamp;     // Timestamp in seconds since boot (4 bytes)
+  /// uint32_t sequence;      // Sequence number (4 bytes)
   static SensorData? parseFromBytes(List<int> bytes) {
     try {
-      final String jsonString = utf8.decode(bytes);
-      return parseFromString(jsonString);
+      // Validate packet size
+      if (bytes.length != 16) {
+        print('Invalid binary packet size: expected 16 bytes, got ${bytes.length}');
+        return null;
+      }
+      
+      // Parse binary data (little-endian format)
+      final ByteData byteData = Uint8List.fromList(bytes).buffer.asByteData();
+      
+      final int co2 = byteData.getUint16(0, Endian.little);
+      final int humidityRaw = byteData.getInt16(2, Endian.little);
+      final int temperatureRaw = byteData.getInt16(4, Endian.little);
+      final int alert = byteData.getUint8(6);
+      // Status flags available at byteData.getUint8(7) if needed
+      // Skip timestamp and sequence for now - we use DateTime.now()
+      
+      // Convert scaled values back to doubles
+      final double humidity = humidityRaw / 10.0;
+      final double temperature = temperatureRaw / 10.0;
+      
+      // Validate ranges
+      if (co2 < 0 || co2 > 65535) {
+        print('CO2 value out of range: $co2');
+        return null;
+      }
+      
+      if (humidity < 0 || humidity > 100) {
+        print('Humidity value out of range: $humidity');
+        return null;
+      }
+      
+      if (alert < 0 || alert > 4) {
+        print('Alert value out of range: $alert');
+        return null;
+      }
+      
+      print('Parsed binary sensor data - CO2: ${co2}ppm, Temp: ${temperature}°C, Humidity: ${humidity}%, Alert: $alert');
+      
+      return SensorData(
+        co2: co2.toDouble(),
+        humidity: humidity,
+        temperature: temperature,
+        alert: alert,
+        timestamp: DateTime.now(), // Use current time since ESP32 timestamp is relative
+      );
+      
     } catch (e) {
-      print('Failed to decode sensor data bytes: $e');
+      print('Failed to parse binary sensor data: $e');
       return null;
     }
   }

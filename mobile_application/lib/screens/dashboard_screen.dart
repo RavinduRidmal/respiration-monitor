@@ -271,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     // Status card with alert indicator
                     Card(
-                      color: Color(_latestData!.alertColor).withOpacity(0.1),
+                      color: Color(_latestData!.alertColor).withValues(alpha: 0.1),
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Row(
@@ -310,12 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 16),
                     
                     // Metric cards
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 1,
-                      childAspectRatio: 2.5,
-                      mainAxisSpacing: 12,
+                    Column(
                       children: [
                         MetricCard(
                           title: 'CO₂ Level',
@@ -326,6 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: const Color(0xFF2196F3),
                           icon: Icons.co2,
                         ),
+                        const SizedBox(height: 12),
                         MetricCard(
                           title: 'Humidity',
                           value: _latestData!.humidity,
@@ -335,6 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: const Color(0xFF00BCD4),
                           icon: Icons.water_drop,
                         ),
+                        const SizedBox(height: 12),
                         MetricCard(
                           title: 'Temperature',
                           value: _latestData!.temperature,
